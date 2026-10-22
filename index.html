@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Egan Hoops 🏀 — Weekly Pickup Basketball</title>
+  <meta name="description" content="Weekly pickup basketball group at Egan Junior High School. Check gym schedule, RSVP, and see who is playing.">
+  <meta name="theme-color" content="#F8F5EE">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="court-header-bg"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-badge">
+        <div class="basketball-crest">🏀</div>
+        <div class="brand-text">
+          <h1>EGAN HOOPS</h1>
+          <p>Los Altos Pickup Basketball</p>
+        </div>
+      </div>
+      <button id="adminBtn" class="admin-lock-btn" title="Organizer Admin Settings">
+        <span id="adminLockIcon">🔒</span> Admin
+      </button>
+    </header>
+
+    <!-- Pinned Announcement Banner -->
+    <div id="announcementBanner" class="announcement-banner" style="display: none;">
+      <span>📣</span>
+      <div id="announcementText">Welcome to Egan Hoops! Check the schedule and RSVP below.</div>
+    </div>
+
+    <!-- Next Game Hero Card -->
+    <main class="hero-card">
+      <div class="game-meta-row">
+        <span class="session-tag" id="sessionTag">Next Game</span>
+        <span id="statusBadge" class="status-badge need-players">
+          <span id="statusDot">●</span> <span id="statusBadgeText">Loading Schedule...</span>
+        </span>
+      </div>
+
+      <div class="game-date-display" id="gameDateDisplay">THURSDAY, OCT 24</div>
+
+      <div class="game-time-location">
+        <div class="time-badge">
+          <span>⏰</span> <span id="gameTimeDisplay">6:30 PM – 8:15 PM</span>
+        </div>
+        <div class="location-badge">
+          <span>📍</span> <span id="gameLocationDisplay">Egan Junior High School (Main Gym)</span>
+        </div>
+      </div>
+
+      <!-- 1-Tap Directions -->
+      <div class="maps-action-row">
+        <a id="appleMapsBtn" href="http://maps.apple.com/?q=Egan+Junior+High+School+100+W+Portola+Ave+Los+Altos+CA+94022" target="_blank" rel="noopener" class="map-btn">
+          <span>🗺️</span> Apple Maps
+        </a>
+        <a id="googleMapsBtn" href="https://www.google.com/maps/search/?api=1&query=Egan+Junior+High+School+100+W+Portola+Ave+Los+Altos+CA+94022" target="_blank" rel="noopener" class="map-btn">
+          <span>📍</span> Google Maps
+        </a>
+      </div>
+
+      <!-- Headcount Target Bar -->
+      <div class="headcount-container">
+        <div class="headcount-header">
+          <div>
+            <span class="headcount-num" id="confirmedCount">0</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-muted);"> players in</span>
+          </div>
+          <div class="headcount-target-text" id="targetStatusText">Target: 8 Min • 10-12 Ideal</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+        <div class="progress-milestones">
+          <span>0</span>
+          <span>8 Min (Game On)</span>
+          <span>10</span>
+          <span>12 Ideal</span>
+        </div>
+      </div>
+
+      <!-- RSVP Controls -->
+      <div class="rsvp-control-box">
+        <!-- Remembered Player Greeting or Input -->
+        <div id="rememberedUserBar" class="player-identity-bar" style="display: none;">
+          <div class="remembered-user-badge">
+            <span>👤</span> Playing as: <strong id="currentUserName">Caleb</strong>
+          </div>
+          <button id="changeUserBtn" class="change-user-link">Not you? Switch</button>
+        </div>
+
+        <div id="nameInputGroup" class="name-input-group">
+          <label for="playerNameInput">Enter Your Name</label>
+          <input 
+            type="text" 
+            id="playerNameInput" 
+            class="varsity-input" 
+            placeholder="e.g. Caleb Morris"
+            autocomplete="name"
+            list="pastPlayersList"
+          >
+          <datalist id="pastPlayersList"></datalist>
+        </div>
+
+        <!-- Guest Details Toggle -->
+        <button id="guestDrawerToggle" type="button" class="guest-expand-toggle">
+          <span>➕</span> Bringing someone or have a note? (Optional)
+        </button>
+
+        <div id="guestDrawer" class="guest-drawer" style="display: none;">
+          <div class="guest-row">
+            <div>
+              <label for="guestCountSelect">Guests (+1s)</label>
+              <select id="guestCountSelect" class="varsity-input" style="padding: 8px 10px;">
+                <option value="0">Just me (0)</option>
+                <option value="1">+1 Guest</option>
+                <option value="2">+2 Guests</option>
+                <option value="3">+3 Guests</option>
+              </select>
+            </div>
+            <div>
+              <label for="guestNamesInput">Guest Name(s)</label>
+              <input type="text" id="guestNamesInput" class="varsity-input" style="padding: 8px 10px;" placeholder="e.g. Alex, Dave">
+            </div>
+          </div>
+          <div>
+            <label for="playerNoteInput">Status Note</label>
+            <input type="text" id="playerNoteInput" class="varsity-input" style="padding: 8px 10px;" placeholder="e.g. Bringing ball, arriving 10m late">
+          </div>
+        </div>
+
+        <!-- Big Tactile IN / OUT Buttons -->
+        <div class="rsvp-buttons-row">
+          <button id="btnImIn" type="button" class="rsvp-btn rsvp-btn-in">
+            <span>I'M IN 🏀</span>
+            <span class="btn-subtext">Count me in</span>
+          </button>
+          <button id="btnImOut" type="button" class="rsvp-btn rsvp-btn-out">
+            <span>I'M OUT</span>
+            <span class="btn-subtext">Can't make it</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- 1-Click Copy Summary for Group Chat -->
+    <div class="share-action-box">
+      <button id="copySummaryBtn" class="share-chat-btn">
+        <span>📋</span> Copy Summary for Group Chat
+      </button>
+    </div>
+
+    <!-- Roster Scorebook: Confirmed IN -->
+    <section class="roster-card" id="rosterInCard">
+      <div class="roster-header">
+        <h2 class="roster-title">
+          <span>🏀 Confirmed Roster</span>
+        </h2>
+        <span class="count-pill count-pill-green" id="rosterInCountPill">0 IN</span>
+      </div>
+      <ul class="player-list" id="inPlayerList">
+        <li class="empty-state">No one has confirmed yet. Be the first!</li>
+      </ul>
+    </section>
+
+    <!-- Roster: Can't Make It (OUT) -->
+    <section class="roster-card" id="rosterOutCard">
+      <div class="roster-header">
+        <h2 class="roster-title" style="font-size: 16px; color: var(--text-muted);">
+          <span>❌ Can't Make It</span>
+        </h2>
+        <span class="count-pill count-pill-gray" id="rosterOutCountPill">0 OUT</span>
+      </div>
+      <ul class="player-list" id="outPlayerList">
+        <li class="empty-state">No one has marked out.</li>
+      </ul>
+    </section>
+
+    <!-- Upcoming Schedule Card -->
+    <section class="roster-card" id="upcomingScheduleCard">
+      <div class="roster-header">
+        <h2 class="roster-title">
+          <span>📅 Upcoming Gym Schedule</span>
+        </h2>
+        <a id="subCalLink" href="webcal://p106-caldav.icloud.com/published/2/MTEzMzQzNDIwOTExMzM0MzDdaOwUKN-asCHRraXSKwGHwRpsKDE3B77yGoRMrYBEOUFvkxtZdkqkGvKNd_L2jFbU9ybD3S5MRqtadZoIuoY" class="session-tag" style="text-decoration: none; cursor: pointer;">
+          📅 Subscribe
+        </a>
+      </div>
+      <div id="upcomingScheduleList">
+        <div class="empty-state">Loading upcoming Thursdays...</div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="text-align: center; margin-top: 30px; font-size: 12px; color: var(--text-muted);">
+      <p>Egan Hoops 🏀 • Egan Junior High School, Los Altos</p>
+      <p style="margin-top: 4px;">Syncs live with Apple iCloud Calendar</p>
+    </footer>
+  </div>
+
+  <!-- Admin Modal -->
+  <div id="adminModal" class="modal-overlay">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-family: var(--font-display); font-size: 22px; text-transform: uppercase;">
+          🛡️ Organizer Admin
+        </h3>
+        <button id="closeAdminModalBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- Auth section if locked -->
+      <div id="adminAuthSection">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          Enter the organizer passcode to post announcements or manage the roster:
+        </p>
+        <input type="password" id="adminPasscodeInput" class="varsity-input" placeholder="Passcode (Default: 2026)" style="margin-bottom: 12px;">
+        <button id="adminLoginBtn" class="share-chat-btn" style="padding: 10px;">Unlock Organizer Tools</button>
+      </div>
+
+      <!-- Admin Tools Section once unlocked -->
+      <div id="adminToolsSection" style="display: none;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">
+            📢 Pinned Announcement Banner
+          </label>
+          <textarea id="adminAnnouncementInput" class="varsity-input" rows="3" placeholder="e.g. Bring light and dark shirts tonight! Gym opens at 6:15 PM."></textarea>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button id="saveAnnouncementBtn" class="map-btn" style="background: var(--navy-primary); color: #fff;">Save Banner</button>
+            <button id="clearAnnouncementBtn" class="map-btn">Clear Banner</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px; border-top: 1px solid var(--card-border); padding-top: 14px;">
+          <label style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">
+            ⚙️ Supabase Realtime Configuration
+          </label>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+            Optional: Enter Supabase credentials to sync live across all player devices. If left blank, runs in instant Local/Demo Mode.
+          </p>
+          <input type="text" id="supabaseUrlInput" class="varsity-input" placeholder="https://xyz.supabase.co" style="font-size: 12px; margin-bottom: 6px;">
+          <input type="password" id="supabaseKeyInput" class="varsity-input" placeholder="anon key (eyJ...)" style="font-size: 12px; margin-bottom: 8px;">
+          <button id="saveSupabaseBtn" class="map-btn">Save Supabase Config</button>
+        </div>
+
+        <div style="border-top: 1px solid var(--card-border); padding-top: 14px;">
+          <button id="adminLogoutBtn" class="map-btn" style="width: 100%; border-color: #DC2626; color: #DC2626;">
+            Lock Organizer Mode
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">Action confirmed!</div>
+
+  <script src="app.js"></script>
+</body>
+</html>
