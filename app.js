@@ -2,6 +2,8 @@
 // Author: Caleb Morris | Designed for Los Altos Pickup Hoops
 
 const DEFAULT_CALENDAR_FEED = "https://p106-caldav.icloud.com/published/2/MTEzMzQzNDIwOTExMzM0MzDdaOwUKN-asCHRraXSKwGHwRpsKDE3B77yGoRMrYBEOUFvkxtZdkqkGvKNd_L2jFbU9ybD3S5MRqtadZoIuoY";
+const DEFAULT_SUPABASE_URL = "https://pfxysdeeopdvunnaadyf.supabase.co";
+const DEFAULT_SUPABASE_KEY = "sb_publishable_a40v6eT8bw6QWurjhg3DtQ_gHHgHRUW";
 const DEFAULT_PASSCODE = "2026";
 const TARGET_MIN_PLAYERS = 8;
 const TARGET_IDEAL_MIN = 10;
@@ -104,14 +106,15 @@ function initSchedule() {
 
 // --- Database & Storage (Supabase + Offline LocalStorage Fallback) ---
 function initDatabase() {
-  const url = localStorage.getItem('egan_hoops_sb_url');
-  const key = localStorage.getItem('egan_hoops_sb_key');
+  const url = localStorage.getItem('egan_hoops_sb_url') || DEFAULT_SUPABASE_URL;
+  const key = localStorage.getItem('egan_hoops_sb_key') || DEFAULT_SUPABASE_KEY;
 
   if (url && key && window.supabase) {
     try {
       state.supabase = window.supabase.createClient(url, key);
       console.log('Connected to Supabase Realtime');
       subscribeToRealtime();
+      loadAnnouncement();
     } catch (e) {
       console.warn('Supabase initialization failed, falling back to local mode:', e);
       state.supabase = null;
@@ -164,7 +167,7 @@ function saveLocalRSVPs() {
 }
 
 function subscribeToRealtime() {
-  if (!state.supabase || !state.currentSession) return;
+  if (!state.supabase) return;
   
   state.supabase
     .channel('public:rsvps')
@@ -172,6 +175,31 @@ function subscribeToRealtime() {
       loadRSVPs();
     })
     .subscribe();
+
+  state.supabase
+    .channel('public:site_settings')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, () => {
+      loadAnnouncement();
+    })
+    .subscribe();
+}
+
+async function loadAnnouncement() {
+  if (!state.supabase) return;
+  try {
+    const { data, error } = await state.supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'announcement')
+      .maybeSingle();
+
+    if (!error && data && data.value) {
+      state.announcement = data.value;
+      renderAnnouncement();
+    }
+  } catch (err) {
+    console.log('Error loading announcement:', err);
+  }
 }
 
 async function saveRSVP(status) {
@@ -586,17 +614,23 @@ function setupAdmin() {
     }
   });
 
-  saveAnnouncementBtn.addEventListener('click', () => {
+  saveAnnouncementBtn.addEventListener('click', async () => {
     const val = announcementInput.value.trim();
     state.announcement = val;
     localStorage.setItem('egan_hoops_announcement', val);
+    if (state.supabase) {
+      await state.supabase.from('site_settings').upsert({ key: 'announcement', value: val, updated_at: new Date().toISOString() });
+    }
     showToast('Banner saved!');
     renderAnnouncement();
   });
 
-  clearAnnouncementBtn.addEventListener('click', () => {
+  clearAnnouncementBtn.addEventListener('click', async () => {
     state.announcement = '';
     localStorage.removeItem('egan_hoops_announcement');
+    if (state.supabase) {
+      await state.supabase.from('site_settings').delete().eq('key', 'announcement');
+    }
     announcementInput.value = '';
     showToast('Banner cleared');
     renderAnnouncement();
