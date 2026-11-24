@@ -12,7 +12,8 @@ const TARGET_IDEAL_MAX = 12;
 // Known gym closure dates parsed from the iCloud feed
 const KNOWN_CLOSURES = new Set([
   "2026-02-26", "2026-03-05", "2026-03-19",
-  "2026-04-23", "2026-04-30", "2026-05-21", "2026-05-28"
+  "2026-04-23", "2026-04-30", "2026-05-21", "2026-05-28",
+  "2026-11-26", "2026-12-03", "2026-12-10"
 ]);
 
 // App State
@@ -75,7 +76,16 @@ async function syncICloudCalendar() {
     const res = await fetch('/api/calendar');
     if (res.ok) {
       const text = await res.text();
+      const prevCount = KNOWN_CLOSURES.size;
       parseIcsClosures(text);
+      if (KNOWN_CLOSURES.size !== prevCount || !state.currentSession) {
+        const prevId = state.currentSession ? state.currentSession.id : null;
+        initSchedule();
+        if (state.currentSession && state.currentSession.id !== prevId) {
+          loadRSVPs();
+        }
+        renderAll();
+      }
     }
   } catch (err) {
     console.log('Using pre-synced calendar rules:', err.message);
@@ -87,8 +97,9 @@ function parseIcsClosures(icsText) {
   for (const ev of events) {
     if (ev.includes('Gym Closed') || ev.includes('CLOSED') || ev.includes('CANCELLED')) {
       const match = ev.match(/DTSTART[^:]*:(\d{8})/);
-      if (match && match[1]) {
-        const raw = match[1];
+      const recurrenceMatch = ev.match(/RECURRENCE-ID[^:]*:(\d{8})/);
+      const raw = (match && match[1]) || (recurrenceMatch && recurrenceMatch[1]);
+      if (raw) {
         const dateStr = `${raw.substring(0,4)}-${raw.substring(4,6)}-${raw.substring(6,8)}`;
         KNOWN_CLOSURES.add(dateStr);
       }
@@ -97,7 +108,7 @@ function parseIcsClosures(icsText) {
 }
 
 function initSchedule() {
-  const allSessions = getUpcomingThursdays(8);
+  const allSessions = getUpcomingThursdays(12);
   // Find the first upcoming Thursday that is NOT closed
   const active = allSessions.find(s => !s.isClosed) || allSessions[0];
   state.currentSession = active;
@@ -462,7 +473,15 @@ function renderAnnouncement() {
     banner.style.display = 'flex';
     textEl.textContent = state.announcement;
   } else {
-    banner.style.display = 'none';
+    // Check if intermediate sessions are closed before the next active game
+    const closedCount = (state.upcomingSessions || []).filter(s => s.isClosed && state.currentSession && s.date < state.currentSession.date).length;
+    if (closedCount > 0 && state.currentSession) {
+      const activeDateFormatted = state.currentSession.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      banner.style.display = 'flex';
+      textEl.textContent = `Gym is closed for the next ${closedCount === 1 ? 'week' : closedCount + ' weeks'}. Next pickup session is ${activeDateFormatted}!`;
+    } else {
+      banner.style.display = 'none';
+    }
   }
 }
 
@@ -470,12 +489,18 @@ function renderUpcomingSchedule() {
   const container = document.getElementById('upcomingScheduleList');
   if (!container || !state.upcomingSessions) return;
 
-  const items = state.upcomingSessions.slice(1, 6).map(s => {
+  const items = state.upcomingSessions.slice(0, 7).map(s => {
+    const isCurrentActive = state.currentSession && s.id === state.currentSession.id;
     const dateFormatted = s.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const statusText = s.isClosed ? '<span style="color: #DC2626; font-weight: 700;">Gym Closed</span>' : 'Open (6:30–8:15 PM)';
+    let statusText = 'Open (6:30–8:15 PM)';
+    if (s.isClosed) {
+      statusText = '<span style="color: #DC2626; font-weight: 700;">Gym Closed</span>';
+    } else if (isCurrentActive) {
+      statusText = '<span style="color: var(--varsity-green); font-weight: 700;">Next Game 🏀</span>';
+    }
 
     return `
-      <div class="schedule-item ${s.isClosed ? 'closed' : ''}">
+      <div class="schedule-item ${s.isClosed ? 'closed' : ''}" style="${isCurrentActive ? 'background: #F0FDF4; border-left: 3px solid var(--varsity-green);' : ''}">
         <div>
           <strong style="color: var(--navy-primary); font-size: 13.5px;">${dateFormatted}</strong>
           <div style="font-size: 11px; color: var(--text-muted);">${s.location}</div>

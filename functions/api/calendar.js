@@ -11,7 +11,7 @@ export async function onRequestGet(context) {
         "Accept": "text/calendar, text/plain, */*"
       },
       cf: {
-        cacheTtl: 600, // cache at Cloudflare edge for 10 minutes
+        cacheTtl: 60, // cache at Cloudflare edge for 1 minute
         cacheEverything: true
       }
     });
@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=600, s-maxage=600"
+        "Cache-Control": "public, max-age=60, s-maxage=60"
       }
     });
   } catch (err) {
