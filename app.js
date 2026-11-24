@@ -28,29 +28,50 @@ let state = {
 };
 
 // --- Calendar & Schedule Engine ---
-function getUpcomingThursdays(count = 8) {
+function getLosAngelesNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(new Date());
+  const map = {};
+  for (const p of parts) map[p.type] = p.value;
+  return {
+    year: parseInt(map.year, 10),
+    month: parseInt(map.month, 10) - 1,
+    day: parseInt(map.day, 10),
+    hour: parseInt(map.hour, 10) % 24,
+    minute: parseInt(map.minute, 10)
+  };
+}
+
+function formatYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getUpcomingThursdays(count = 12) {
   const sessions = [];
-  const now = new Date();
-  
-  // Find current or next Thursday
-  let current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 30);
+  const la = getLosAngelesNow();
+
+  // Start from current Los Angeles calendar date at 6:30 PM
+  const current = new Date(la.year, la.month, la.day, 18, 30);
   const dayOfWeek = current.getDay(); // 0 is Sunday, 4 is Thursday
-  
+
   let daysUntilThursday = (4 - dayOfWeek + 7) % 7;
-  
-  // If today is Thursday, check if session already ended (ended after 20:15 / 8:15 PM)
-  if (dayOfWeek === 4) {
-    const sessionEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 15);
-    if (now > sessionEnd) {
-      daysUntilThursday = 7; // Advance to next Thursday
-    }
+
+  // If today in Los Angeles is Thursday, check if session already ended (after 20:15 / 8:15 PM)
+  if (dayOfWeek === 4 && (la.hour > 20 || (la.hour === 20 && la.minute >= 15))) {
+    daysUntilThursday = 7; // Advance to next Thursday
   }
 
   current.setDate(current.getDate() + daysUntilThursday);
 
   for (let i = 0; i < count; i++) {
     const sessionDate = new Date(current);
-    const dateStr = sessionDate.toISOString().split('T')[0];
+    const dateStr = formatYMD(sessionDate);
     const isClosed = KNOWN_CLOSURES.has(dateStr);
 
     sessions.push({
@@ -94,8 +115,9 @@ async function syncICloudCalendar() {
 
 function parseIcsClosures(icsText) {
   const events = icsText.split('BEGIN:VEVENT');
-  for (const ev of events) {
-    if (ev.includes('Gym Closed') || ev.includes('CLOSED') || ev.includes('CANCELLED')) {
+  for (let i = 1; i < events.length; i++) {
+    const ev = events[i].split('END:VEVENT')[0];
+    if (/Gym Closed|CLOSED|CANCELLED/i.test(ev)) {
       const match = ev.match(/DTSTART[^:]*:(\d{8})/);
       const recurrenceMatch = ev.match(/RECURRENCE-ID[^:]*:(\d{8})/);
       const raw = (match && match[1]) || (recurrenceMatch && recurrenceMatch[1]);
